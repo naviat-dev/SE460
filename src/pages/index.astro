@@ -1,0 +1,37 @@
+---
+const text = await (
+    await fetch("https://ourairports.com/data/airports.csv")
+).text();
+
+const rows = text.split("\n").slice(1);
+const airports = rows.map((row) => {
+    const cols = row.split(",");
+    return {
+        id: cols[0],
+        ident: cols[1],
+        type: cols[2],
+        name: cols[3],
+        latitude_deg: cols[4],
+        longitude_deg: cols[5],
+        elevation_ft: cols[6],
+        iso_country: cols[7],
+        iso_region: cols[8],
+        municipality: cols[9],
+        scheduled_service: cols[10],
+        icao_code: cols[11],
+        iata_code: cols[12],
+        gps_code: cols[13],
+        local_code: cols[14],
+    };
+});
+---
+
+<ul>
+    {
+        airports.map((a) => (
+            <li>
+                {a.name} ({a.ident}) - {a.municipality}, {a.iso_country}
+            </li>
+        ))
+    }
+</ul>
