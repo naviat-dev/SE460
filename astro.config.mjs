@@ -1,10 +1,8 @@
 // @ts-check
 import { defineConfig } from 'astro/config';
-import node from '@astrojs/node';
 
 // https://astro.build/config
 export default defineConfig({
-    output: 'server',
-    adapter: node({ mode: 'standalone' }),
-    site: 'https://naviat-dev.github.io',
+    site: 'https://naviat-dev.github.io/SE460',
+    base: '/SE460',
 });

@@ -179,6 +179,10 @@
         </main>
 
         <script type="module">
+            import Papa from "papaparse";
+
+            const AIRPORTS_CSV_URL = "https://davidmegginson.github.io/ourairports-data/airports.csv";
+
             const form = document.querySelector("#search-form");
             const queryInput = document.querySelector("#airport-query");
             const statusText = document.querySelector("#search-status");
@@ -201,8 +205,64 @@
             }
 
             let searchDebounceTimer;
-            let activeRequestController;
             let latestResults = [];
+            let airportsPromise;
+
+            const clean = (value) => String(value || "").trim();
+            const parseNumber = (value) => {
+                const next = Number(clean(value));
+                return Number.isFinite(next) ? next : null;
+            };
+
+            const parseAirports = (csvText) => {
+                const parsed = Papa.parse(csvText, {
+                    header: true,
+                    skipEmptyLines: true,
+                    transformHeader: (header) => header.trim(),
+                });
+
+                return parsed.data
+                    .map((row) => {
+                        const ident = clean(row.ident).toUpperCase();
+                        const name = clean(row.name);
+                        if (!ident || !name) {
+                            return null;
+                        }
+
+                        return {
+                            ident,
+                            name,
+                            type: clean(row.type),
+                            municipality: clean(row.municipality),
+                            isoCountry: clean(row.iso_country),
+                            isoRegion: clean(row.iso_region),
+                            elevationFt: parseNumber(row.elevation_ft),
+                            latitudeDeg: parseNumber(row.latitude_deg),
+                            longitudeDeg: parseNumber(row.longitude_deg),
+                            scheduledService: clean(row.scheduled_service).toLowerCase() === "yes",
+                            iataCode: clean(row.iata_code).toUpperCase(),
+                            gpsCode: clean(row.gps_code).toUpperCase(),
+                            localCode: clean(row.local_code).toUpperCase(),
+                        };
+                    })
+                    .filter(Boolean);
+            };
+
+            const loadAirports = async () => {
+                if (!airportsPromise) {
+                    airportsPromise = (async () => {
+                        const response = await fetch(AIRPORTS_CSV_URL);
+                        if (!response.ok) {
+                            throw new Error(`Airport data request failed with status ${response.status}.`);
+                        }
+
+                        const csvText = await response.text();
+                        return parseAirports(csvText);
+                    })();
+                }
+
+                return airportsPromise;
+            };
 
             const escaped = (value) =>
                 value
@@ -223,7 +283,69 @@
                 return labels.length ? labels.join(" | ") : "Code unavailable";
             };
 
-            const airportLink = (ident) => `/airport/${encodeURIComponent(ident)}`;
+            const airportLink = (ident) => `./airport/?ident=${encodeURIComponent(ident)}`;
+
+            const searchScore = (airport, query) => {
+                const normalizedQuery = clean(query).toUpperCase();
+                if (!normalizedQuery) {
+                    return 0;
+                }
+
+                const codes = [airport.ident, airport.iataCode, airport.gpsCode, airport.localCode]
+                    .map((code) => clean(code).toUpperCase())
+                    .filter(Boolean);
+
+                if (codes.includes(normalizedQuery)) {
+                    return 120;
+                }
+
+                if (codes.some((code) => code.startsWith(normalizedQuery))) {
+                    return 95;
+                }
+
+                const upperName = airport.name.toUpperCase();
+                if (upperName.startsWith(normalizedQuery)) {
+                    return 80;
+                }
+
+                const haystack = [
+                    airport.ident,
+                    airport.name,
+                    airport.municipality,
+                    airport.isoCountry,
+                    airport.isoRegion,
+                    airport.iataCode,
+                    airport.gpsCode,
+                    airport.localCode,
+                ]
+                    .filter(Boolean)
+                    .join(" ")
+                    .toUpperCase();
+
+                if (haystack.includes(normalizedQuery)) {
+                    return 50;
+                }
+
+                return 0;
+            };
+
+            const searchAirports = (airports, query, limit = 25) => {
+                const scored = airports
+                    .map((airport) => ({
+                        airport,
+                        score: searchScore(airport, query),
+                    }))
+                    .filter((entry) => entry.score > 0)
+                    .sort((a, b) => {
+                        if (b.score !== a.score) {
+                            return b.score - a.score;
+                        }
+
+                        return a.airport.name.localeCompare(b.airport.name);
+                    });
+
+                return scored.slice(0, limit).map((entry) => entry.airport);
+            };
 
             const renderResults = (airports) => {
                 latestResults = airports;
@@ -267,37 +389,18 @@
                     return;
                 }
 
-                if (activeRequestController) {
-                    activeRequestController.abort();
-                }
-
-                activeRequestController = new AbortController();
-                statusText.textContent = "Searching airports...";
-
-                const endpoint = `/api/airports/search?q=${encodeURIComponent(query)}&limit=25`;
                 try {
-                    const response = await fetch(endpoint, {
-                        signal: activeRequestController.signal,
-                    });
+                    statusText.textContent = "Loading airport database...";
+                    const airports = await loadAirports();
+                    const matches = searchAirports(airports, query, 25);
 
-                    if (!response.ok) {
-                        throw new Error(`Search failed with status ${response.status}.`);
-                    }
-
-                    const data = await response.json();
-                    const airports = Array.isArray(data.airports) ? data.airports : [];
-
-                    renderResults(airports);
-                    statusText.textContent = airports.length
-                        ? `Showing ${airports.length} match${airports.length === 1 ? "" : "es"}.`
+                    renderResults(matches);
+                    statusText.textContent = matches.length
+                        ? `Showing ${matches.length} match${matches.length === 1 ? "" : "es"}.`
                         : "No airport matched that search.";
                 } catch (error) {
-                    if (error instanceof DOMException && error.name === "AbortError") {
-                        return;
-                    }
-
                     renderResults([]);
-                    statusText.textContent = "Airport search is temporarily unavailable. Try again in a moment.";
+                    statusText.textContent = "Airport data is temporarily unavailable. Try again in a moment.";
                 }
             };
 
