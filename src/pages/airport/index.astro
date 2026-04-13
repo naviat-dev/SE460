@@ -292,8 +292,6 @@
     </main>
 
     <script type="module">
-      import Papa from "papaparse";
-
       const AIRPORTS_CSV_URL = "https://davidmegginson.github.io/ourairports-data/airports.csv";
       const FREQUENCIES_CSV_URL = "https://davidmegginson.github.io/ourairports-data/airport-frequencies.csv";
       const FLIGHTPLAN_AIRPORT_URL = "https://api.flightplandatabase.com/nav/airport";
@@ -374,12 +372,71 @@
       let airportsPromise;
       let frequencyIndexPromise;
 
-      const parseCsv = (csvText) =>
-        Papa.parse(csvText, {
-          header: true,
-          skipEmptyLines: true,
-          transformHeader: (header) => header.trim(),
-        }).data;
+      const parseCsv = (csvText) => {
+        const rows = [];
+        let row = [];
+        let field = "";
+        let inQuotes = false;
+
+        for (let i = 0; i < csvText.length; i += 1) {
+          const char = csvText[i];
+
+          if (char === '"') {
+            if (inQuotes && csvText[i + 1] === '"') {
+              field += '"';
+              i += 1;
+            } else {
+              inQuotes = !inQuotes;
+            }
+            continue;
+          }
+
+          if (char === "," && !inQuotes) {
+            row.push(field);
+            field = "";
+            continue;
+          }
+
+          if ((char === "\n" || char === "\r") && !inQuotes) {
+            if (char === "\r" && csvText[i + 1] === "\n") {
+              i += 1;
+            }
+
+            row.push(field);
+            field = "";
+
+            if (row.some((value) => value !== "")) {
+              rows.push(row);
+            }
+
+            row = [];
+            continue;
+          }
+
+          field += char;
+        }
+
+        if (field.length > 0 || row.length > 0) {
+          row.push(field);
+          if (row.some((value) => value !== "")) {
+            rows.push(row);
+          }
+        }
+
+        if (!rows.length) {
+          return [];
+        }
+
+        const headers = rows[0].map((header) => header.trim());
+        return rows.slice(1).map((columns) => {
+          const record = {};
+          headers.forEach((header, index) => {
+            record[header] = String(columns[index] ?? "").trim();
+          });
+
+          return record;
+        });
+      };
 
       const loadAirports = async () => {
         if (!airportsPromise) {
