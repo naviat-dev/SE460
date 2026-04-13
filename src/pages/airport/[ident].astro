@@ -1,0 +1,553 @@
+---
+const airportIdent = String(Astro.params.ident ?? "").toUpperCase();
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{airportIdent} Airport Details</title>
+    <style>
+      :root {
+        --bg: #f7f4ee;
+        --surface: #ffffff;
+        --surface-soft: #f4f7fb;
+        --text-main: #0f2334;
+        --text-muted: #4a5f74;
+        --border: rgba(15, 35, 52, 0.18);
+        --casual: #2f6f91;
+        --expert: #b9432a;
+        --expert-soft: rgba(185, 67, 42, 0.12);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background:
+          radial-gradient(circle at 90% 10%, #f9e4d9, transparent 28%),
+          radial-gradient(circle at 8% 78%, #d9ebf4, transparent 34%),
+          var(--bg);
+        color: var(--text-main);
+        font-family: "Segoe UI", "Trebuchet MS", "Gill Sans", sans-serif;
+        min-height: 100vh;
+      }
+
+      .shell {
+        width: min(980px, 92vw);
+        margin: 0 auto;
+        padding: 2.3rem 0 2.5rem;
+      }
+
+      .topbar {
+        display: flex;
+        justify-content: space-between;
+        gap: 1rem;
+        align-items: center;
+        margin-bottom: 1.2rem;
+      }
+
+      .home-link {
+        text-decoration: none;
+        color: var(--casual);
+        font-weight: 700;
+      }
+
+      .home-link:hover,
+      .home-link:focus-visible {
+        text-decoration: underline;
+      }
+
+      .card {
+        background: rgba(255, 255, 255, 0.88);
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        padding: 1.25rem;
+        box-shadow: 0 20px 40px rgba(30, 45, 61, 0.08);
+      }
+
+      h1 {
+        margin: 0;
+        font-size: clamp(1.9rem, 4vw, 2.8rem);
+      }
+
+      .subtitle {
+        color: var(--text-muted);
+        margin: 0.35rem 0 0;
+      }
+
+      .controls {
+        display: flex;
+        gap: 0.6rem;
+        margin: 1.1rem 0;
+        flex-wrap: wrap;
+      }
+
+      .mode-button {
+        border: 1px solid var(--border);
+        background: var(--surface);
+        color: var(--text-main);
+        border-radius: 10px;
+        padding: 0.65rem 0.9rem;
+        font: inherit;
+        cursor: pointer;
+        font-weight: 700;
+      }
+
+      .mode-button.active-casual {
+        background: rgba(47, 111, 145, 0.12);
+        border-color: var(--casual);
+        color: #154765;
+      }
+
+      .mode-button.active-expert {
+        background: var(--expert-soft);
+        border-color: var(--expert);
+        color: #7f2917;
+      }
+
+      .status {
+        min-height: 1.2rem;
+        color: var(--text-muted);
+        margin: 0.4rem 0 0;
+      }
+
+      .info-grid {
+        margin-top: 1rem;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+        gap: 0.65rem;
+      }
+
+      .info-tile {
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        background: var(--surface-soft);
+        padding: 0.7rem 0.8rem;
+      }
+
+      .label {
+        color: var(--text-muted);
+        font-size: 0.84rem;
+        margin-bottom: 0.2rem;
+      }
+
+      .value {
+        font-weight: 600;
+        margin: 0;
+      }
+
+      .panel {
+        margin-top: 1rem;
+      }
+
+      .panel h2 {
+        margin: 0 0 0.55rem;
+      }
+
+      .stack {
+        display: grid;
+        gap: 0.9rem;
+      }
+
+      .subpanel {
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 0.8rem;
+        background: #ffffff;
+      }
+
+      .subpanel h3 {
+        margin: 0 0 0.5rem;
+      }
+
+      .list {
+        margin: 0;
+        padding-left: 1.1rem;
+        display: grid;
+        gap: 0.45rem;
+      }
+
+      .notam-list {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        display: grid;
+        gap: 0.6rem;
+      }
+
+      .notam-item {
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 0.65rem;
+        background: #fff;
+      }
+
+      .notam-id {
+        font-weight: 700;
+        margin: 0 0 0.4rem;
+      }
+
+      .notam-message {
+        margin: 0;
+        white-space: pre-wrap;
+      }
+
+      .warning-list {
+        margin: 0;
+        padding-left: 1rem;
+        color: #7f2917;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+
+      th,
+      td {
+        text-align: left;
+        border-bottom: 1px solid rgba(15, 35, 52, 0.13);
+        padding: 0.45rem 0.25rem;
+      }
+
+      .hidden {
+        display: none;
+      }
+
+      @media (max-width: 640px) {
+        .shell {
+          padding-top: 1rem;
+        }
+
+        .card {
+          padding: 1rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <div class="topbar">
+        <a href="/" class="home-link">Back To Search</a>
+      </div>
+
+      <section class="card">
+        <h1 id="airport-title">Loading airport...</h1>
+        <p id="airport-subtitle" class="subtitle">Preparing airport data for {airportIdent}</p>
+
+        <div class="controls">
+          <button id="casual-button" class="mode-button active-casual" type="button" aria-pressed="true">
+            Casual
+          </button>
+          <button id="expert-button" class="mode-button" type="button" aria-pressed="false">
+            Expert
+          </button>
+        </div>
+
+        <p id="mode-status" class="status" aria-live="polite"></p>
+
+        <section id="casual-panel" class="panel">
+          <h2>Casual Overview</h2>
+          <div id="casual-grid" class="info-grid"></div>
+        </section>
+
+        <section id="expert-panel" class="panel hidden">
+          <h2>Expert Details</h2>
+          <div class="stack">
+            <section class="subpanel">
+              <h3>Frequencies</h3>
+              <div id="frequency-container">Loading frequencies...</div>
+            </section>
+
+            <section class="subpanel">
+              <h3>SIDs</h3>
+              <ul id="sid-list" class="list"></ul>
+            </section>
+
+            <section class="subpanel">
+              <h3>STARs</h3>
+              <ul id="star-list" class="list"></ul>
+            </section>
+
+            <section class="subpanel">
+              <h3>NOTAMs</h3>
+              <ul id="notam-list" class="notam-list"></ul>
+              <p id="notam-fallback" class="status hidden"></p>
+            </section>
+
+            <section class="subpanel">
+              <h3>Expert Warnings</h3>
+              <ul id="warning-list" class="warning-list"></ul>
+            </section>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <script type="module" define:vars={{ airportIdent }}>
+      const title = document.querySelector("#airport-title");
+      const subtitle = document.querySelector("#airport-subtitle");
+      const statusText = document.querySelector("#mode-status");
+      const casualButton = document.querySelector("#casual-button");
+      const expertButton = document.querySelector("#expert-button");
+      const casualPanel = document.querySelector("#casual-panel");
+      const expertPanel = document.querySelector("#expert-panel");
+      const casualGrid = document.querySelector("#casual-grid");
+      const frequencyContainer = document.querySelector("#frequency-container");
+      const sidList = document.querySelector("#sid-list");
+      const starList = document.querySelector("#star-list");
+      const notamList = document.querySelector("#notam-list");
+      const notamFallback = document.querySelector("#notam-fallback");
+      const warningList = document.querySelector("#warning-list");
+
+      const requiredElements = [
+        title,
+        subtitle,
+        statusText,
+        casualButton,
+        expertButton,
+        casualPanel,
+        expertPanel,
+        casualGrid,
+        frequencyContainer,
+        sidList,
+        starList,
+        notamList,
+        notamFallback,
+        warningList,
+      ];
+
+      if (requiredElements.some((element) => !element)) {
+        throw new Error("Airport page is missing required UI containers.");
+      }
+
+      const escapeText = (value) =>
+        String(value)
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#39;");
+
+      const formatCoordinate = (value) =>
+        typeof value === "number" && Number.isFinite(value) ? value.toFixed(5) : "Unknown";
+
+      const formatElevation = (value) =>
+        typeof value === "number" && Number.isFinite(value) ? `${Math.round(value)} ft` : "Unknown";
+
+      const formatFrequency = (value) =>
+        typeof value === "number" && Number.isFinite(value) ? `${value.toFixed(3)} MHz` : "Unknown";
+
+      const apiAirportUrl = `/api/airports/${encodeURIComponent(airportIdent)}`;
+      const apiExpertUrl = `/api/airports/${encodeURIComponent(airportIdent)}/expert`;
+
+      let airportData = null;
+      let expertData = null;
+      let expertLoaded = false;
+
+      const setMode = (mode) => {
+        const casual = mode === "casual";
+
+        casualPanel.classList.toggle("hidden", !casual);
+        expertPanel.classList.toggle("hidden", casual);
+
+        casualButton.classList.toggle("active-casual", casual);
+        expertButton.classList.toggle("active-expert", !casual);
+
+        casualButton.setAttribute("aria-pressed", String(casual));
+        expertButton.setAttribute("aria-pressed", String(!casual));
+      };
+
+      const renderCasual = (airport) => {
+        const tiles = [
+          ["Name", airport.name || "Unknown"],
+          ["ICAO", airport.ident || "Unknown"],
+          ["IATA", airport.iataCode || "Unknown"],
+          ["Country", airport.isoCountry || "Unknown"],
+          ["Region", airport.isoRegion || "Unknown"],
+          ["Municipality", airport.municipality || "Unknown"],
+          ["Type", (airport.type || "Unknown").replaceAll("_", " ")],
+          ["Scheduled Service", airport.scheduledService ? "Yes" : "No"],
+          ["Elevation", formatElevation(airport.elevationFt)],
+          ["Latitude", formatCoordinate(airport.latitudeDeg)],
+          ["Longitude", formatCoordinate(airport.longitudeDeg)],
+        ];
+
+        casualGrid.innerHTML = tiles
+          .map(
+            ([label, value]) => `
+              <article class="info-tile">
+                <p class="label">${escapeText(label)}</p>
+                <p class="value">${escapeText(value)}</p>
+              </article>
+            `,
+          )
+          .join("");
+      };
+
+      const renderFrequencyTable = (frequencies) => {
+        if (!frequencies.length) {
+          frequencyContainer.innerHTML = "<p class=\"status\">No frequencies available.</p>";
+          return;
+        }
+
+        const rows = frequencies
+          .map(
+            (entry) => `
+              <tr>
+                <td>${escapeText(entry.type || "OTHER")}</td>
+                <td>${escapeText(entry.name || "Unknown")}</td>
+                <td>${escapeText(formatFrequency(entry.frequencyMhz))}</td>
+              </tr>
+            `,
+          )
+          .join("");
+
+        frequencyContainer.innerHTML = `
+          <table>
+            <thead>
+              <tr>
+                <th>Type</th>
+                <th>Description</th>
+                <th>Frequency</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        `;
+      };
+
+      const renderChartList = (container, charts, emptyMessage) => {
+        if (!charts.length) {
+          container.innerHTML = `<li>${escapeText(emptyMessage)}</li>`;
+          return;
+        }
+
+        container.innerHTML = charts
+          .map((chart) => {
+            const label = `${chart.chartCode || "PROC"} - ${chart.chartName || chart.pdfName || "Unnamed"}`;
+            const href = escapeText(chart.pdfPath || "#");
+            return `<li><a href="${href}" target="_blank" rel="noreferrer noopener">${escapeText(label)}</a></li>`;
+          })
+          .join("");
+      };
+
+      const renderNotams = (expert) => {
+        if (expert.notams.length) {
+          notamList.innerHTML = expert.notams
+            .map(
+              (item) => `
+                <li class="notam-item">
+                  <p class="notam-id">${escapeText(item.id || "NOTAM")}</p>
+                  <p class="notam-message">${escapeText(item.message || "No text")}</p>
+                </li>
+              `,
+            )
+            .join("");
+
+          notamFallback.classList.add("hidden");
+          notamFallback.textContent = "";
+          return;
+        }
+
+        notamList.innerHTML = "";
+        notamFallback.classList.remove("hidden");
+        notamFallback.innerHTML = `No direct NOTAM records were returned. Use FAA NOTAM Search: <a href="${escapeText(expert.notamSearchUrl)}" target="_blank" rel="noreferrer noopener">Open NOTAM Search</a>.`;
+      };
+
+      const renderWarnings = (warnings) => {
+        if (!warnings.length) {
+          warningList.innerHTML = "<li>No warnings reported.</li>";
+          return;
+        }
+
+        warningList.innerHTML = warnings.map((warning) => `<li>${escapeText(warning)}</li>`).join("");
+      };
+
+      const loadAirport = async () => {
+        statusText.textContent = `Loading ${airportIdent}...`;
+
+        const response = await fetch(apiAirportUrl);
+        if (!response.ok) {
+          throw new Error(`Airport lookup failed with status ${response.status}.`);
+        }
+
+        const payload = await response.json();
+        const airport = payload.airport;
+        if (!airport) {
+          throw new Error("Airport payload was empty.");
+        }
+
+        airportData = airport;
+        title.textContent = `${airport.name} (${airport.ident})`;
+        subtitle.textContent = `${airport.municipality || "Unknown city"}, ${airport.isoCountry || "Unknown country"}`;
+        renderCasual(airport);
+        statusText.textContent = "Casual mode shows core airport details.";
+      };
+
+      const loadExpert = async () => {
+        if (expertLoaded && expertData) {
+          return expertData;
+        }
+
+        statusText.textContent = "Loading expert data (SIDs/STARs, frequencies, NOTAMs)...";
+
+        const response = await fetch(apiExpertUrl);
+        if (!response.ok) {
+          throw new Error(`Expert lookup failed with status ${response.status}.`);
+        }
+
+        const payload = await response.json();
+        const expert = payload.expert;
+        if (!expert) {
+          throw new Error("Expert payload was empty.");
+        }
+
+        expertData = expert;
+        expertLoaded = true;
+
+        renderFrequencyTable(expert.frequencies || []);
+        renderChartList(sidList, expert.sids || [], "No SID charts found.");
+        renderChartList(starList, expert.stars || [], "No STAR charts found.");
+        renderNotams(expert);
+        renderWarnings(expert.warnings || []);
+
+        statusText.textContent = "Expert mode loaded.";
+        return expert;
+      };
+
+      casualButton.addEventListener("click", () => {
+        setMode("casual");
+        if (airportData) {
+          statusText.textContent = "Casual mode shows core airport details.";
+        }
+      });
+
+      expertButton.addEventListener("click", async () => {
+        setMode("expert");
+        try {
+          await loadExpert();
+        } catch {
+          statusText.textContent = "Expert data could not be loaded right now.";
+          renderWarnings([
+            "Expert data request failed. Confirm the external providers are reachable and try again.",
+          ]);
+        }
+      });
+
+      setMode("casual");
+
+      loadAirport().catch(() => {
+        title.textContent = "Airport Not Found";
+        subtitle.textContent = `No airport record matched ${airportIdent}.`;
+        statusText.textContent = "Try returning to search and selecting a valid airport code.";
+        casualGrid.innerHTML =
+          "<article class=\"info-tile\"><p class=\"label\">Hint</p><p class=\"value\">Search by ICAO, IATA, or name to find a valid route.</p></article>";
+        expertButton.setAttribute("disabled", "true");
+      });
+    </script>
+  </body>
+</html>
