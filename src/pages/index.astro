@@ -1,37 +1,327 @@
 ---
-const text = await (
-    await fetch("https://ourairports.com/data/airports.csv")
-).text();
-
-const rows = text.split("\n").slice(1);
-const airports = rows.map((row) => {
-    const cols = row.split(",");
-    return {
-        id: cols[0],
-        ident: cols[1],
-        type: cols[2],
-        name: cols[3],
-        latitude_deg: cols[4],
-        longitude_deg: cols[5],
-        elevation_ft: cols[6],
-        iso_country: cols[7],
-        iso_region: cols[8],
-        municipality: cols[9],
-        scheduled_service: cols[10],
-        icao_code: cols[11],
-        iata_code: cols[12],
-        gps_code: cols[13],
-        local_code: cols[14],
-    };
-});
 ---
 
-<ul>
-    {
-        airports.map((a) => (
-            <li>
-                {a.name} ({a.ident}) - {a.municipality}, {a.iso_country}
-            </li>
-        ))
-    }
-</ul>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Airport Explorer</title>
+        <style>
+            :root {
+                --bg-top: #f4efe7;
+                --bg-mid: #e4f0ec;
+                --bg-bottom: #d8e2ef;
+                --text-main: #112337;
+                --text-muted: #3f556b;
+                --panel: rgba(255, 255, 255, 0.82);
+                --panel-border: rgba(17, 35, 55, 0.14);
+                --accent: #b9432a;
+                --accent-hover: #963620;
+            }
+
+            * {
+                box-sizing: border-box;
+            }
+
+            body {
+                margin: 0;
+                min-height: 100vh;
+                color: var(--text-main);
+                font-family: "Segoe UI", "Trebuchet MS", "Gill Sans", sans-serif;
+                background: radial-gradient(circle at 15% 15%, #f8f2ea, transparent 32%),
+                    radial-gradient(circle at 85% 20%, #d4ebe2, transparent 28%),
+                    linear-gradient(180deg, var(--bg-top), var(--bg-mid) 42%, var(--bg-bottom));
+            }
+
+            .page-shell {
+                width: min(920px, 92vw);
+                margin: 0 auto;
+                padding: 4rem 0 3rem;
+            }
+
+            .hero {
+                background: var(--panel);
+                border: 1px solid var(--panel-border);
+                border-radius: 20px;
+                padding: 2rem;
+                box-shadow: 0 22px 40px rgba(25, 43, 61, 0.1);
+            }
+
+            .eyebrow {
+                margin: 0;
+                color: var(--accent);
+                font-weight: 700;
+                letter-spacing: 0.08em;
+                text-transform: uppercase;
+                font-size: 0.8rem;
+            }
+
+            h1 {
+                margin: 0.6rem 0 0.9rem;
+                font-size: clamp(2rem, 5vw, 3.2rem);
+                line-height: 1.05;
+            }
+
+            .lead {
+                margin: 0;
+                color: var(--text-muted);
+                max-width: 60ch;
+            }
+
+            .search-panel {
+                margin-top: 1.5rem;
+                display: grid;
+                gap: 0.8rem;
+            }
+
+            .search-panel input {
+                width: 100%;
+                padding: 0.95rem 1rem;
+                border-radius: 12px;
+                border: 1px solid rgba(17, 35, 55, 0.24);
+                font: inherit;
+                font-size: 1rem;
+                background: #fff;
+            }
+
+            .search-panel input:focus {
+                outline: 3px solid rgba(185, 67, 42, 0.22);
+                border-color: var(--accent);
+            }
+
+            .status {
+                min-height: 1.2rem;
+                margin: 0;
+                color: var(--text-muted);
+            }
+
+            .results {
+                margin: 0;
+                padding: 0;
+                list-style: none;
+                display: grid;
+                gap: 0.75rem;
+            }
+
+            .results a {
+                display: block;
+                text-decoration: none;
+                color: inherit;
+                background: rgba(255, 255, 255, 0.9);
+                border: 1px solid rgba(17, 35, 55, 0.18);
+                border-radius: 12px;
+                padding: 0.85rem 0.95rem;
+                transition: transform 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
+            }
+
+            .results a:hover,
+            .results a:focus-visible {
+                transform: translateY(-1px);
+                border-color: var(--accent);
+                box-shadow: 0 10px 20px rgba(17, 35, 55, 0.12);
+            }
+
+            .code-row {
+                display: flex;
+                gap: 0.5rem;
+                flex-wrap: wrap;
+                margin-top: 0.3rem;
+                color: var(--text-muted);
+                font-size: 0.92rem;
+            }
+
+            .badge {
+                display: inline-flex;
+                align-items: center;
+                padding: 0.15rem 0.4rem;
+                border-radius: 999px;
+                background: rgba(185, 67, 42, 0.12);
+                color: var(--accent-hover);
+                font-size: 0.78rem;
+                font-weight: 700;
+            }
+
+            @media (max-width: 640px) {
+                .page-shell {
+                    padding-top: 2.2rem;
+                }
+
+                .hero {
+                    padding: 1.2rem;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <main class="page-shell">
+            <section class="hero">
+                <p class="eyebrow">Airport Navigator</p>
+                <h1>Search The Airport Database</h1>
+                <p class="lead">
+                    Find airports by ICAO, IATA, name, city, or region. Choose an airport to open a dedicated
+                    page with Casual and Expert information modes.
+                </p>
+
+                <form id="search-form" class="search-panel" autocomplete="off">
+                    <label for="airport-query">Airport Search</label>
+                    <input
+                        id="airport-query"
+                        name="airport-query"
+                        type="search"
+                        placeholder="Try KJFK, JFK, Heathrow, Denver, or Tokyo"
+                        minlength="2"
+                    />
+                </form>
+
+                <p id="search-status" class="status" aria-live="polite"></p>
+                <ul id="search-results" class="results"></ul>
+            </section>
+        </main>
+
+        <script type="module">
+            const form = document.querySelector("#search-form");
+            const queryInput = document.querySelector("#airport-query");
+            const statusText = document.querySelector("#search-status");
+            const resultsList = document.querySelector("#search-results");
+
+            if (!(form instanceof HTMLFormElement)) {
+                throw new Error("Search form was not found.");
+            }
+
+            if (!(queryInput instanceof HTMLInputElement)) {
+                throw new Error("Search input was not found.");
+            }
+
+            if (!(statusText instanceof HTMLElement)) {
+                throw new Error("Status container was not found.");
+            }
+
+            if (!(resultsList instanceof HTMLUListElement)) {
+                throw new Error("Results list was not found.");
+            }
+
+            let searchDebounceTimer;
+            let activeRequestController;
+            let latestResults = [];
+
+            const escaped = (value) =>
+                value
+                    .replaceAll("&", "&amp;")
+                    .replaceAll("<", "&lt;")
+                    .replaceAll(">", "&gt;")
+                    .replaceAll('"', "&quot;")
+                    .replaceAll("'", "&#39;");
+
+            const codeLabel = (airport) => {
+                const labels = [
+                    airport.ident && `ICAO ${airport.ident}`,
+                    airport.iataCode && `IATA ${airport.iataCode}`,
+                    airport.gpsCode && `GPS ${airport.gpsCode}`,
+                    airport.localCode && `Local ${airport.localCode}`,
+                ].filter(Boolean);
+
+                return labels.length ? labels.join(" | ") : "Code unavailable";
+            };
+
+            const airportLink = (ident) => `/airport/${encodeURIComponent(ident)}`;
+
+            const renderResults = (airports) => {
+                latestResults = airports;
+
+                if (!airports.length) {
+                    resultsList.innerHTML = "";
+                    return;
+                }
+
+                resultsList.innerHTML = airports
+                    .map((airport) => {
+                        const municipality = escaped(airport.municipality || "Unknown city");
+                        const country = escaped(airport.isoCountry || "Unknown country");
+                        const title = escaped(airport.name);
+                        const codeLine = escaped(codeLabel(airport));
+                        const type = escaped((airport.type || "airport").replaceAll("_", " "));
+
+                        return `
+                            <li>
+                                <a href="${airportLink(airport.ident)}">
+                                    <strong>${title}</strong>
+                                    <div class="code-row">
+                                        <span>${municipality}, ${country}</span>
+                                        <span>${codeLine}</span>
+                                    </div>
+                                    <div class="code-row">
+                                        <span class="badge">${type}</span>
+                                    </div>
+                                </a>
+                            </li>
+                        `;
+                    })
+                    .join("");
+            };
+
+            const runSearch = async (rawQuery) => {
+                const query = rawQuery.trim();
+                if (query.length < 2) {
+                    statusText.textContent = "Type at least 2 characters to search.";
+                    renderResults([]);
+                    return;
+                }
+
+                if (activeRequestController) {
+                    activeRequestController.abort();
+                }
+
+                activeRequestController = new AbortController();
+                statusText.textContent = "Searching airports...";
+
+                const endpoint = `/api/airports/search?q=${encodeURIComponent(query)}&limit=25`;
+                try {
+                    const response = await fetch(endpoint, {
+                        signal: activeRequestController.signal,
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`Search failed with status ${response.status}.`);
+                    }
+
+                    const data = await response.json();
+                    const airports = Array.isArray(data.airports) ? data.airports : [];
+
+                    renderResults(airports);
+                    statusText.textContent = airports.length
+                        ? `Showing ${airports.length} match${airports.length === 1 ? "" : "es"}.`
+                        : "No airport matched that search.";
+                } catch (error) {
+                    if (error instanceof DOMException && error.name === "AbortError") {
+                        return;
+                    }
+
+                    renderResults([]);
+                    statusText.textContent = "Airport search is temporarily unavailable. Try again in a moment.";
+                }
+            };
+
+            queryInput.addEventListener("input", () => {
+                if (searchDebounceTimer) {
+                    clearTimeout(searchDebounceTimer);
+                }
+
+                searchDebounceTimer = setTimeout(() => {
+                    runSearch(queryInput.value);
+                }, 220);
+            });
+
+            form.addEventListener("submit", (event) => {
+                event.preventDefault();
+                if (!latestResults.length) {
+                    runSearch(queryInput.value);
+                    return;
+                }
+
+                window.location.href = airportLink(latestResults[0].ident);
+            });
+
+            statusText.textContent = "Type at least 2 characters to search.";
+        </script>
+    </body>
+</html>
